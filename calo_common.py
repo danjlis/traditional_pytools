@@ -44,10 +44,14 @@ class LayerGeometry:
         self.neta = neta
         self.nphi = nphi
         self.radius = radius
-        # BuildFormerGeometry pushes HCal towers out by half a radius
-        self.center_radius = radius * 1.5 if layer in (LAYER_IHCAL, LAYER_OHCAL) else radius
         self.deta = (ETA_MAX - ETA_MIN) / neta
         self.dphi = 2 * math.pi / nphi
+        self.set_uniform()
+
+    def set_uniform(self):
+        """The approximate uniform grid (used for CSV input)."""
+        # BuildFormerGeometry pushes HCal towers out by half a radius
+        self.center_radius = self.radius * 1.5 if self.layer in (LAYER_IHCAL, LAYER_OHCAL) else self.radius
         self.phi0 = 0.5 * self.dphi  # center of iphi = 0
         self.eta_centers = None  # measured eta bin centers, if any
 
@@ -132,6 +136,8 @@ def read_towers(path, default_layer=None):
     If layer is absent, default_layer is used (error if that is None too).
     Returns a list of Tower objects; duplicate (layer, ieta, iphi) entries raise ValueError.
     """
+    for geom in GEOMETRY.values():
+        geom.set_uniform()  # undo any geometry installed by an earlier mmap read
     towers = []
     seen = {}
     with open(path, newline="") as f:
