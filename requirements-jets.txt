@@ -1,0 +1,2 @@
+fastjet>=3.5
+mmap_ninja>=0.9
