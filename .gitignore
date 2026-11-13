@@ -1,0 +1,5 @@
+__pycache__/
+.venv/
+# written by examples/run_example.py
+examples/example_event_*.csv
+examples/example_*.json

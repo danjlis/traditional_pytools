@@ -65,7 +65,7 @@ class TopoClusterer:
                  sigma_seed=4.0, sigma_grow=2.0, sigma_peri=0.0,
                  local_max_min_e_ihcal=1.0, local_max_min_e_ohcal=1.0, local_max_min_e_emcal=1.0,
                  r_shower=0.025, min_cluster_e=0.0, allow_corner_neighbor=True, use_abs_e=True,
-                 enable_hcal=True, enable_emcal=True, do_split=True):
+                 enable_hcal=True, enable_emcal=True, do_split=True, emcal_phi_offset=None):
         self.noise = [noise_ihcal, noise_ohcal, noise_emcal]
         self.sigma_seed = sigma_seed
         self.sigma_grow = sigma_grow
@@ -87,7 +87,10 @@ class TopoClusterer:
         # First EMCal iphi in front of IHCal iphi = 0. The C++ hard-codes 5; with geometry
         # measured from an mmap file, use the EMCal towers actually inside that IHCal tower.
         gem, gih = GEOMETRY[LAYER_EMCAL], GEOMETRY[LAYER_IHCAL]
-        if gem.eta_centers is None:
+        # emcal_phi_offset=None picks it automatically; pass 5 to force the C++ value
+        if emcal_phi_offset is not None:
+            self.emcal_phi_offset = emcal_phi_offset
+        elif gem.eta_centers is None:
             self.emcal_phi_offset = 5
         else:
             low_edge = gih.phi0 - 0.5 * gih.dphi
@@ -176,10 +179,10 @@ class TopoClusterer:
         return adjacent
 
     def etacenter(self, tid):
-        return self.geom[self.get_ilayer(tid)].get_etacenter(self.get_ieta(tid))
+        return self.geom[self.get_ilayer(tid)].get_bin_etacenter(self.get_ieta(tid))
 
     def phicenter(self, tid):
-        return self.geom[self.get_ilayer(tid)].get_phicenter(self.get_iphi(tid))
+        return self.geom[self.get_ilayer(tid)].get_bin_phicenter(self.get_iphi(tid))
 
     # ------------------------------------------------------------------ main algorithm
 
@@ -534,6 +537,7 @@ def run_topo_clustering(towers, **params):
             "sigma_seed": tc.sigma_seed,
             "sigma_grow": tc.sigma_grow,
             "sigma_peri": tc.sigma_peri,
+            "emcal_phi_offset": tc.emcal_phi_offset,
             "local_max_min_e_emcal": tc.local_max_min_e[LAYER_EMCAL],
             "local_max_min_e_ihcal": tc.local_max_min_e[LAYER_IHCAL],
             "local_max_min_e_ohcal": tc.local_max_min_e[LAYER_OHCAL],

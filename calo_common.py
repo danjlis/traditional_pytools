@@ -35,6 +35,21 @@ ETA_MIN = -1.1
 ETA_MAX = 1.1
 
 
+def _load_eta_bounds():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sphenix_tower_bounds.json")
+    try:
+        import json
+        with open(path) as f:
+            data = json.load(f)
+    except OSError:
+        return {}, {}
+    return ({name: [tuple(b) for b in v["eta_bounds"]] for name, v in data.items()},
+            {name: [tuple(b) for b in v["phi_bounds"]] for name, v in data.items()})
+
+
+SPHENIX_ETA_BOUNDS, SPHENIX_PHI_BOUNDS = _load_eta_bounds()
+
+
 class LayerGeometry:
     """Cylindrical tower grid for one calorimeter layer (RawTowerGeomContainer_Cylinderv1 analogue)."""
 
@@ -79,6 +94,30 @@ class LayerGeometry:
 
     def get_phibin(self, phi):
         return int(math.floor((phi - self.phi0) / self.dphi + 0.5)) % self.nphi
+
+    def get_etabounds(self, ieta):
+        """(low, high) eta edges of a bin (RawTowerGeomContainer::get_etabounds).
+
+        With measured geometry these are the real sPHENIX bounds from sphenix_tower_bounds.json
+        (dumped from the CDB calo_geo; the EMCal bins are not contiguous between blocks);
+        on the uniform grid they are the grid edges."""
+        if self.eta_centers is not None and self.name in SPHENIX_ETA_BOUNDS:
+            return SPHENIX_ETA_BOUNDS[self.name][ieta]
+        return ETA_MIN + ieta * self.deta, ETA_MIN + (ieta + 1) * self.deta
+
+    def get_bin_etacenter(self, ieta):
+        """RawTowerGeomContainer::get_etacenter: the midpoint of the bin's eta bounds. With
+        measured geometry this differs slightly from the eta of the tower center position."""
+        lo, hi = self.get_etabounds(ieta)
+        return 0.5 * (lo + hi)
+
+    def get_bin_phicenter(self, iphi):
+        """RawTowerGeomContainer::get_phicenter: the midpoint of the bin's phi bounds. With
+        measured geometry this follows the CDB convention (e.g. HCal bin 0 sits near 2 pi)."""
+        if self.eta_centers is not None and self.name in SPHENIX_PHI_BOUNDS:
+            lo, hi = SPHENIX_PHI_BOUNDS[self.name][iphi]
+            return 0.5 * (lo + hi)
+        return self.get_phicenter(iphi)
 
     def get_center(self, ieta, iphi):
         """Tower center (x, y, z) in cm."""

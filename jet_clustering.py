@@ -85,20 +85,79 @@ class JetInput:
         self.n_merged = n_merged
 
 
-def retower_cemc(towers):
-    """RetowerCEMC::get_fraction - sum EMCal tower energies onto the IHCal grid.
+def _retower_eta_map(gem, gih):
+    """RetowerCEMC::get_weighted_fraction: for each IHCal eta bin, the first and last EMCal eta
+    bins it covers and the fraction of each of those two that lies inside it."""
+    lower, upper = [], []
+    ie = 0
+    for ih in range(gih.neta):
+        ih_lo, ih_hi = gih.get_etabounds(ih)
+        found_lo = found_hi = False
+        while (not found_lo or not found_hi) and ie < gem.neta:
+            em_lo, em_hi = gem.get_etabounds(ie)
+            if not found_lo:
+                if em_hi > ih_lo and em_lo <= ih_lo:
+                    lower.append((ie, (em_hi - ih_lo) / (em_hi - em_lo)))
+                    found_lo = True
+                if em_hi > ih_lo and em_lo > ih_lo:
+                    lower.append((ie, 1.0))
+                    found_lo = True
+            else:
+                if em_hi >= ih_hi and em_lo < ih_hi:
+                    upper.append((ie, (ih_hi - em_lo) / (em_hi - em_lo)))
+                    found_hi = True
+                if em_hi > ih_hi and em_lo > ih_hi:
+                    ie -= 1
+                    upper.append((ie, 1.0))
+                    found_hi = True
+            if not (found_lo and found_hi):
+                ie += 1
+        if not (found_lo and found_hi):
+            raise RuntimeError(f"retowering: no EMCal eta bins found for IHCal ieta {ih}")
+    return lower, upper
 
-    Returns {(ieta_ihcal, iphi_ihcal): (energy, n_emcal_towers)}.
+
+def _retower_first_phi(gem, gih):
+    """RetowerCEMC::get_first_phi_index: first EMCal iphi of the four behind IHCal iphi 0."""
+    first = next((k for k in range(gem.nphi) if gih.get_phibin(gem.get_phicenter(k)) == 0), None)
+    if first is None:
+        raise RuntimeError("retowering: no EMCal tower behind IHCal iphi 0")
+    if first == 0:
+        k = gem.nphi - 1
+        while k > 0 and gih.get_phibin(gem.get_phicenter(k)) != gih.nphi - 1:
+            k -= 1
+        first = 0 if k + 1 == gem.nphi else k + 1
+    return first
+
+
+def retower_cemc(towers):
+    """RetowerCEMC (weighted energy distribution, the default): sum EMCal towers onto the
+    IHCal grid. Each IHCal tower takes 4 EMCal towers in phi and the EMCal eta bins inside its
+    eta bounds, the two boundary bins weighted by their overlap. Bad towers must already be
+    removed from `towers` (C++ skips !isGood towers).
+
+    Returns {(ieta_ihcal, iphi_ihcal): (energy, n_emcal_towers)} for every IHCal tower that has
+    at least one EMCal input tower.
     """
     gem = GEOMETRY[LAYER_EMCAL]
     gih = GEOMETRY[LAYER_IHCAL]
+    lower, upper = _retower_eta_map(gem, gih)
+    first_phi = _retower_first_phi(gem, gih)
+    emcal = {(t.ieta, t.iphi): t.energy for t in towers if t.layer == LAYER_EMCAL}
     retowered = {}
-    for t in towers:
-        if t.layer != LAYER_EMCAL:
-            continue
-        key = (gih.get_etabin(gem.get_etacenter(t.ieta)), gih.get_phibin(gem.get_phicenter(t.iphi)))
-        e, n = retowered.get(key, (0.0, 0))
-        retowered[key] = (e + t.energy, n + 1)
+    for ih in range(gih.neta):
+        (ie_lo, f_lo), (ie_hi, f_hi) = lower[ih], upper[ih]
+        for ip in range(gih.nphi):
+            energy, n = 0.0, 0
+            for ie in range(ie_lo, ie_hi + 1):
+                frac = f_lo if ie == ie_lo else (f_hi if ie == ie_hi else 1.0)
+                for k in range(4):
+                    e = emcal.get((ie, (first_phi + 4 * ip + k) % gem.nphi))
+                    if e is not None:
+                        energy += e * frac
+                        n += 1
+            if n:
+                retowered[(ih, ip)] = (energy, n)
     return retowered
 
 

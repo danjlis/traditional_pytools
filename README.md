@@ -85,7 +85,10 @@ binned on a uniform eta/phi grid, which approximates the real geometry.
 
 ## Limitations
 
-- Not yet validated against output of the C++ code.
+- Validated against the C++ on 100 run 29 Jet12 events (see ../calotree): Template clusters,
+  topoclusters, retowered EMCal and jets agree object by object to float precision, given the
+  same towers (all towers, bad ones removed) and the measured geometry. `sphenix_tower_bounds.json`
+  holds the CDB tower bounds used for retowering and the Topo bin centers.
 - CSV geometry is approximate (uniform bins); mmap geometry is measured from the file.
 - Template: no shower-profile probability or chi2 (reported as null), no incidence-angle
   correction, no bad-tower handling.
