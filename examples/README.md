@@ -112,6 +112,21 @@ Jets (sPHENIX default: anti-kt R = 0.4 on retowered EMCal + IHCal + OHCal towers
     --layers cemc --no-retower --jet-max-eta 0.7 --area --vz 10 --no-constituents
 ```
 
+Jets from clusters: give the jet finder the JSON written by either clustering tool. Each
+cluster becomes one massless input pointing from the vertex to the cluster position (as
+sPHENIX's `ClusterJetInput`). The vertex defaults to the one the clusters were made with
+(`--vz` overrides it). Clusters with E < 0 are dropped.
+
+```
+.venv/bin/python topo_clustering.py examples/example_event_all.csv -o topo.json
+.venv/bin/python jet_clustering.py topo.json --jet-min-pt 1          # jets of topoclusters
+
+.venv/bin/python emcal_template_clustering.py examples/example_event_emcal.csv -o emc.json
+.venv/bin/python jet_clustering.py emc.json --cluster-energy ecore   # jets of EMCal clusters
+```
+
+`--layers` and `--no-retower` apply only to tower input.
+
 Try `--no-subcluster-splitting` (template) or `--no-split` (topo). The close photon pair
 then comes out as a single ~7.3 GeV cluster.
 
@@ -170,6 +185,13 @@ Jets (`jet_clustering.py`):
 }
 ```
 
+With cluster input, `parameters` also holds `input: "clusters"`, `cluster_algorithm` and
+`cluster_energy`, there is `n_input_clusters` instead of `n_input_towers`, and each
+constituent is `{"input": "TOPO_CLUSTER" or "CEMC_CLUSTER", "cluster_id", "eta", "phi",
+"energy", "pt"}`, where `cluster_id` is the cluster's `id` (or position) in the cluster JSON.
+For topocluster jets, the EMCal/IHCal/OHCal fractions split each cluster by its
+`energy_emcal/ihcal/ohcal`. EMCal cluster jets have `emcal_frac` = 1.
+
 - Retowered EMCal constituents are indexed on the IHCal grid (24 x 64);
   `n_emcal_towers` says how many EMCal towers were summed into each one.
 - Jet inputs are massless towers with eta measured from the vertex (`--vz`). Towers with
@@ -189,11 +211,12 @@ import sys; sys.path.insert(0, "path/to/project_tools")
 from calo_common import read_towers, LAYER_EMCAL
 from emcal_template_clustering import run_template_clustering
 from topo_clustering import run_topo_clustering
-from jet_clustering import run_jet_clustering   # needs fastjet: run with .venv/bin/python
+from jet_clustering import run_jet_clustering, run_jet_clustering_on_clusters   # needs fastjet
 
 result = run_template_clustering(read_towers("examples/example_event_emcal.csv",
                                              default_layer=LAYER_EMCAL), vz=0.0)
 topo = run_topo_clustering(read_towers("examples/example_event_all.csv"), sigma_peri=0.0)
 jets = run_jet_clustering(read_towers("examples/example_event_all.csv"), jet_r=0.4, jet_min_pt=1.0)
-print(result["n_clusters"], topo["n_clusters"], jets["n_jets"])
+topo_jets = run_jet_clustering_on_clusters(topo, jet_r=0.4, jet_min_pt=1.0)   # jets of topoclusters
+print(result["n_clusters"], topo["n_clusters"], jets["n_jets"], topo_jets["n_jets"])
 ```

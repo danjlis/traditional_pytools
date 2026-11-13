@@ -8,7 +8,7 @@ clusters or jets it finds.
 |------|--------------------------------------|--------------|
 | `emcal_template_clustering.py` | `CaloReco/RawClusterBuilderTemplate` (BEmcRec / BEmcRecCEMC) | EMCal |
 | `topo_clustering.py` | `CaloReco/RawClusterBuilderTopo` | EMCal, inner HCal, outer HCal |
-| `jet_clustering.py` | `jetbase/TowerJetInput`, `jetbase/FastJetAlgo`, `jetbackground/RetowerCEMC` | EMCal, inner HCal, outer HCal |
+| `jet_clustering.py` | `jetbase/TowerJetInput`, `jetbase/ClusterJetInput`, `jetbase/FastJetAlgo`, `jetbackground/RetowerCEMC` | towers (EMCal, inner HCal, outer HCal), or the cluster JSON of either clustering tool |
 
 `calo_common.py` holds the shared tower readers and calorimeter geometry.
 
@@ -48,6 +48,13 @@ On one event of a `calo_features.mmap` directory:
 .venv/bin/python emcal_template_clustering.py path/to/calo_features.mmap --event 5 --min-cluster-e 0.5
 .venv/bin/python topo_clustering.py           path/to/calo_features.mmap --event 5
 .venv/bin/python jet_clustering.py            path/to/calo_features.mmap --event 5 --jet-min-pt 3
+```
+
+Jets from clusters instead of towers: pass the JSON written by a clustering tool.
+
+```
+.venv/bin/python topo_clustering.py path/to/calo_features.mmap --event 5 -o topo.json
+.venv/bin/python jet_clustering.py  topo.json --jet-min-pt 3
 ```
 
 On a CSV file of towers:
